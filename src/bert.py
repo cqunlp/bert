@@ -414,4 +414,55 @@ class BertForPretraining(BertPretrainedCell):
             outputs = (total_loss,) + outputs
         return outputs
     
+class BertForMaskedLM(BertPretrainedCell):
+    def __init__(self, config, *args, **kwargs):
+        super().__init__(config, *args, **kwargs)
+        self.bert = BertModel(config)
+        self.cls = BertOnlyMLMHead(config)
 
+        self.cls.predictions.decoder.weight = self.bert.embeddings.word_embeddings.embedding_table
+
+    def construct(self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
+                  masked_lm_labels=None):
+        outputs = self.bert(input_ids,
+                            attention_mask=attention_mask,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            head_mask=head_mask)
+        
+        sequence_output = outputs[0]
+        prediction_scores = self.cls(sequence_output)
+
+        outputs = (prediction_scores,) + outputs[:2]
+        if masked_lm_labels is not None:
+            loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
+            masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), masked_lm_labels.view(-1))
+            outputs = (masked_lm_loss,) + outputs
+
+        return outputs
+
+class BertForNextSentencePrediction(BertPretrainedCell):
+    def __init__(self, config, *args, **kwargs):
+        super().__init__(config, *args, **kwargs)
+        self.bert = BertModel(config)
+        self.cls = BertOnlyNSPHead(config)
+    
+    def construct(self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
+                  next_sentence_label=None):
+        outputs = self.bert(input_ids,
+                            attention_mask=attention_mask,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids, 
+                            head_mask=head_mask)
+
+        pooled_output = outputs[1]
+
+        seq_relationship_score = self.cls(pooled_output)
+
+        outputs = (seq_relationship_score,) + outputs[2:]  # add hidden states and attention if they are here
+        if next_sentence_label is not None:
+            loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
+            next_sentence_loss = loss_fct(seq_relationship_score.view(-1, 2), next_sentence_label.view(-1))
+            outputs = (next_sentence_loss,) + outputs
+
+        return outputs  # (next_sentence_loss), seq_relationship_score, (hidden_states), (attentions)
