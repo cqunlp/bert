@@ -10,7 +10,7 @@ from mindspore import Parameter
 from mindspore.common.initializer import initializer
 from ..common.modules import activation_map, Dense, Embedding
 from ..common.abc import PretrainedCell
-from ..configs.bert import BertConfig
+from .config import BertConfig
 
 PRETRAINED_MODEL_ARCHIVE_MAP = {
     "bert-base-uncased": "https://huggingface.co/lvyufeng/bert/resolve/main/bert-base-uncased.ckpt",

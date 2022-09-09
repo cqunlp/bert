@@ -5,7 +5,7 @@ import mindspore.ops as ops
 from collections import OrderedDict
 from mindspore import log as logger
 from mindspore import Parameter, Tensor, ParameterTuple
-from .lr_scheduler import _LRSchedule, SCHEDULES
+from ..common.modules.lr_scheduler import _LRSchedule, SCHEDULES
 from .ops import clip_grad_norm
 
 class _RequiredParameter(object):
