@@ -6,7 +6,7 @@ import os
 from typing import Optional, Union
 from mindspore import nn
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
-from ..utils import load_from_cache, HUGGINGFACE_BASE_URL
+from .utils import load_from_cache, HUGGINGFACE_BASE_URL
 from .config import PretrainedConfig
 
 class PretrainedCell(nn.Cell):
