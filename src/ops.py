@@ -208,7 +208,7 @@ def norm(x, ord=None, axis=None, keepdims=False):
             ret = _multi_svd_norm(x, row_axis, col_axis, sum)
         else:
             conj = _get_cache_prim(ops.Conj)()
-            ret = sqrt(ops.reduce_sum((conj(x) * x), axis=axis))
+            ret = sqrt(ops.reduce_sum((conj(x) * x), axis))
         if keepdims:
             ret_shape = list(x.shape)
             ret_shape[axis[0]] = 1

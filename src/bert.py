@@ -13,9 +13,9 @@ from .layers import Dense, Embedding
 from .cell import PretrainedCell
 from .config import BertConfig
 from icecream import ic
-#lyx add for test
-from mindspore import context
-context.set_context(mode=context.PYNATIVE_MODE)
+# #lyx add for test
+# from mindspore import context
+# context.set_context(mode=context.PYNATIVE_MODE)
 
 PRETRAINED_MODEL_ARCHIVE_MAP = {
     "bert-base-uncased": "https://huggingface.co/lvyufeng/bert/resolve/main/bert-base-uncased.ckpt",
