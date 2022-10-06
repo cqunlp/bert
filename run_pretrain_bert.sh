@@ -1,0 +1,1 @@
+nohup mpirun -n 8 python run_parallel_pretrain.py >> pretrain.log 2>&1 &

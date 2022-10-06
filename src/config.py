@@ -2,6 +2,15 @@ import os
 import json
 import logging
 from .utils import load_from_cache
+from .utils import get_mindrecord_list
+
+pretrain_mindrecord_list = [
+    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_aa/',
+    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ab/',
+    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ac/',
+    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ad/',
+    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ae/',
+]
 
 class PretrainedConfig:
     """
@@ -15,6 +24,13 @@ class PretrainedConfig:
         self.num_labels = kwargs.pop('num_labels', 2)
         self.output_attentions = kwargs.pop('output_attentions', False)
         self.output_hidden_states = kwargs.pop('output_hidden_states', False)
+        self.train_batch_size = kwargs.pop('train_batch_size', 128)
+        self.eval_batch_size = kwargs.pop('eval_batch_size', 128)
+        self.do_save_ckpt = kwargs.pop('do_save_ckpt', True)
+        self.save_ckpt_path = kwargs.pop('save_ckpt_path', '/data0/bert/model_save')
+        self.epochs = kwargs.pop('epochs', 40)
+        self.dataset_mindreocrd_dir = kwargs.pop('dataset_mindreocrd_dir',\
+        get_mindrecord_list(pretrain_mindrecord_list))
 
     @classmethod
     def load(cls, pretrained_model_name_or_path, **kwargs):

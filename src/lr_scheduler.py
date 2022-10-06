@@ -3,8 +3,9 @@ import mindspore
 import mindspore.log as logger
 import mindspore.ops as ops
 import mindspore.nn as nn
-from mindspore import ms_class, Parameter, Tensor
+from mindspore import Parameter, Tensor
 from mindspore.ops import constexpr
+from icecream import ic
 
 @constexpr
 def log_warning(info):
@@ -40,11 +41,11 @@ class _LRSchedule(nn.Cell):
         progress = step / self.t_total
         ret = self.get_lr_(progress)
         # warning for exceeding t_total (only active with warmup_linear
-        if not nowarn and self.warn_t_total and progress > 1. and progress > self.warned_for_t_total_at_progress:
-            log_warning(
-                "Training beyond specified 't_total'. Learning rate multiplier set to {}. Please set 't_total' of {} correctly."
-                    .format(ret, self.__class__.__name__))
-            ops.assign(self.warned_for_t_total_at_progress, progress)
+        # if not nowarn and self.warn_t_total and progress > 1. and progress > self.warned_for_t_total_at_progress:
+        #     log_warning(
+        #         "Training beyond specified 't_total'. Learning rate multiplier set to {}. Please set 't_total' of {} correctly."
+        #             .format(ret, self.__class__.__name__))
+        #     ops.assign(self.warned_for_t_total_at_progress, progress)
         # end warning
         return ret
 

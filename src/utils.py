@@ -1,4 +1,8 @@
 import mindspore.nn as nn
+import mindspore
+import mindspore.dataset as ds
+import mindspore.dataset.transforms as transforms
+from mindspore.communication import init, get_rank, get_group_size
 
 import os
 import requests
@@ -8,6 +12,7 @@ import shutil
 from pathlib import Path
 from tqdm import tqdm
 from typing import IO
+from icecream import ic
 
 try:
     from pathlib import Path
@@ -110,3 +115,20 @@ activation_map = {
     'gelu_approximate': nn.GELU(),
     'swish':nn.SiLU()
 }
+
+# transforms and read mindrecords as list
+def get_mindrecord_list(mindrecord_dir_list):
+    mindrecord_list = []
+    def _is_mindrecord(file):
+        return file.endswith(".mindrecord") 
+
+    for num, path in enumerate(mindrecord_dir_list):
+        files = os.listdir(path)
+        mindrecord_files = list(filter(_is_mindrecord, files))
+        def _concat_mindrecord_path(file):
+            new_path = path + file
+            return new_path
+
+        mindrecord_list.append(list(map(_concat_mindrecord_path, mindrecord_files)))
+    mindrecord_list = [b for a in mindrecord_list for b in a]
+    return mindrecord_list

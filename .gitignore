@@ -128,4 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-.rank_0/
+# 
+bert_pppl_test/pppl.log
+rank_0
+model_save
+pretrain.log
+save_and_eval.log
