@@ -147,7 +147,7 @@ class BertSelfAttention(nn.Cell):
         new_x_shape = x.shape[:-1] + (self.num_attention_heads, self.attention_head_size)
         x = x.view(*new_x_shape)
         # lyx test
-        # print("x.shape",x.shape)
+        # ic("x.shape",x.shape)
         return x.transpose(0, 2, 1, 3)
     
     def construct(self, hidden_states, attention_mask=None, head_mask=None):
@@ -397,10 +397,10 @@ class BertForPretraining(BertPretrainedCell):
         self.vocab_size = config.vocab_size
 
         self.cls.predictions.decoder.weight = self.bert.embeddings.word_embeddings.embedding_table
-        self.loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
+        # self.loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
 
-    def construct(self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
-                  masked_lm_labels=None, next_sentence_label=None):
+    def construct(self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None):
+        # ic("attention_mask",attention_mask.shape)
         outputs = self.bert(
             input_ids,
             attention_mask=attention_mask,
@@ -408,23 +408,20 @@ class BertForPretraining(BertPretrainedCell):
             position_ids=position_ids,
             head_mask=head_mask
         )
-        # ic(outputs) # [shape(batch_size, 128, 256), shape(batch_size, 256)]
 
         sequence_output, pooled_output = outputs[:2]
         prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output)
 
         outputs = (prediction_scores, seq_relationship_score,) + outputs[2:]
-        # ic(outputs) # [shape(batch_size, 128, 256), shape(batch_size, 256)]
 
-        if masked_lm_labels is not None and next_sentence_label is not None:
-            # ic(prediction_scores.shape) # (batch_size, 128, 30522)
-            # ic(masked_lm_labels.shape) # (batch_size, 20)
-            masked_lm_loss = self.loss_fct(prediction_scores.view(-1, self.vocab_size), masked_lm_labels.view(-1))
-            next_sentence_loss = self.loss_fct(seq_relationship_score.view(-1, 2), next_sentence_label.view(-1))
-            total_loss = masked_lm_loss + next_sentence_loss
-            outputs = (total_loss,) + outputs
-            # outputs [Tensor(shape=[], dtype=Float32, value= 64.9807), Tensor(shape=[1, 128, 30522], Tensor(shape=[1, 2])
-        return outputs
+        # if masked_lm_labels is not None and next_sentence_label is not None:
+        #     masked_lm_loss = self.loss_fct(prediction_scores.view(-1, self.vocab_size), masked_lm_labels.view(-1))
+        #     next_sentence_loss = self.loss_fct(seq_relationship_score.view(-1, 2), next_sentence_label.view(-1))
+        #     total_loss = masked_lm_loss + next_sentence_loss
+        #     outputs = (total_loss,) + outputs
+        #     return outputs, masked_lm_loss, next_sentence_loss, prediction_scores, seq_relationship_score
+
+        return outputs, prediction_scores, seq_relationship_score, self.vocab_size
     
 class BertForMaskedLM(BertPretrainedCell):
     def __init__(self, config, *args, **kwargs):

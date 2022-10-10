@@ -132,3 +132,21 @@ def get_mindrecord_list(mindrecord_dir_list):
         mindrecord_list.append(list(map(_concat_mindrecord_path, mindrecord_files)))
     mindrecord_list = [b for a in mindrecord_list for b in a]
     return mindrecord_list
+
+# save ckpt func
+def save_bert_min_checkpoint(cur_epoch_nums,\
+                            cur_step_nums,\
+                            save_checkpoint_path,\
+                            rank_num,\
+                            network):
+    per_card_save_model_path = ('bert-min_ckpt_'+\
+    'epoch_{}_'.format(cur_epoch_nums)+\
+    'step_{}_'.format(cur_step_nums)+\
+    'card_id_{}'.format(rank_num))
+    ckpt_save_dir = os.path.join(save_checkpoint_path,('card_id_' + str(rank_num)),\
+    per_card_save_model_path)
+    mindspore.save_checkpoint(save_obj=network,
+                              ckpt_file_name=ckpt_save_dir,
+                              integrated_save=True,
+                              async_save=True)
+

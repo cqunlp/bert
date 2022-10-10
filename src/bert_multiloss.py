@@ -147,7 +147,7 @@ class BertSelfAttention(nn.Cell):
         new_x_shape = x.shape[:-1] + (self.num_attention_heads, self.attention_head_size)
         x = x.view(*new_x_shape)
         # lyx test
-        # print(x.shape)
+        # ic("x.shape",x.shape)
         return x.transpose(0, 2, 1, 3)
     
     def construct(self, hidden_states, attention_mask=None, head_mask=None):
@@ -401,6 +401,7 @@ class BertForPretraining(BertPretrainedCell):
 
     def construct(self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
                   masked_lm_labels=None, next_sentence_label=None):
+        # ic("attention_mask",attention_mask.shape)
         outputs = self.bert(
             input_ids,
             attention_mask=attention_mask,
@@ -408,6 +409,7 @@ class BertForPretraining(BertPretrainedCell):
             position_ids=position_ids,
             head_mask=head_mask
         )
+        
         # ic(outputs) # [shape(batch_size, 128, 256), shape(batch_size, 256)]
 
         sequence_output, pooled_output = outputs[:2]

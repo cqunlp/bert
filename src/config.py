@@ -28,7 +28,7 @@ class PretrainedConfig:
         self.eval_batch_size = kwargs.pop('eval_batch_size', 128)
         self.do_save_ckpt = kwargs.pop('do_save_ckpt', True)
         self.save_ckpt_path = kwargs.pop('save_ckpt_path', '/data0/bert/model_save')
-        self.epochs = kwargs.pop('epochs', 40)
+        self.epochs = kwargs.pop('epochs', 10)
         self.dataset_mindreocrd_dir = kwargs.pop('dataset_mindreocrd_dir',\
         get_mindrecord_list(pretrain_mindrecord_list))
 

@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import mindspore
 import mindspore.nn as nn
@@ -7,6 +8,7 @@ from mindspore import log as logger
 from mindspore import Parameter, Tensor, ParameterTuple
 from .lr_scheduler import _LRSchedule, SCHEDULES
 from .ops import clip_grad_norm
+from icecream import ic
 
 class _RequiredParameter(object):
     """Singleton class representing a required parameter for an Optimizer."""
@@ -106,9 +108,10 @@ class BertAdam(Optimizer):
         if not isinstance(schedule, _LRSchedule):
             schedule_type = SCHEDULES[schedule]
             schedule = schedule_type(warmup=warmup, t_total=t_total)
+            # ic(schedule_type)
         else:
             if warmup != -1 or t_total != -1:
-                logger.warning("warmup and t_total on the optimizer are ineffective when _LRSchedule object is provided as schedule. "
+                logging.warning("warmup and t_total on the optimizer are ineffective when _LRSchedule object is provided as schedule. "
                                "Please specify custom warmup and t_total in _LRSchedule object.")
         defaults = OrderedDict(lr=lr, schedule=schedule,
                                b1=b1, b2=b2, e=e, weight_decay=weight_decay,
@@ -141,7 +144,9 @@ class BertAdam(Optimizer):
         count = 0
         for g_idx, group in enumerate(self.param_groups):
             params, lr, schedule, beta1, beta2, e, weight_decay, max_grad_norm = group
+            # ic(self.step)
             lr_scheduled = schedule(self.step) * lr
+            # ic(lr_scheduled)
             for p_idx, p in enumerate(params):
                 state = self.states[g_idx][p_idx]
                 next_m, next_v = state[0], state[1]

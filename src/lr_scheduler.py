@@ -28,6 +28,7 @@ class _LRSchedule(nn.Cell):
             raise ValueError("Invalid warmup: {} - should be in [0.0, 1.0[ or -1".format(warmup))
         warmup = max(warmup, 0.)
         self.warmup, self.t_total = float(warmup), float(t_total)
+        # ic(self.warmup, self.t_total)
         self.warned_for_t_total_at_progress = Parameter(Tensor(-1., mindspore.float32), 'warned_for_t_total_at_progress')
 
     def construct(self, step, nowarn=False):
@@ -38,8 +39,10 @@ class _LRSchedule(nn.Cell):
         """
         if self.t_total < 0:
             return 1.
+        # ic(step)
         progress = step / self.t_total
         ret = self.get_lr_(progress)
+        # ic(ret)
         # warning for exceeding t_total (only active with warmup_linear
         # if not nowarn and self.warn_t_total and progress > 1. and progress > self.warned_for_t_total_at_progress:
         #     log_warning(
@@ -144,8 +147,11 @@ class WarmupLinearSchedule(_LRSchedule):
     """
     warn_t_total = True
     def get_lr_(self, progress):
+        # ic(self.warmup, progress)
         if progress < self.warmup:
+            # ic(progress / self.warmup)
             return progress / self.warmup
+        # ic(ops.maximum((progress - 1.) / (self.warmup - 1.), 0.))
         return ops.maximum((progress - 1.) / (self.warmup - 1.), 0.)
 
 
