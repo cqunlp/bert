@@ -134,3 +134,7 @@ rank_0
 model_save
 pretrain.log
 save_and_eval.log
+akg_kernel_meta/
+data/
+graphs/
+*.key
