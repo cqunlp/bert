@@ -1,15 +1,16 @@
-import os
-import logging
 import mindspore.nn as nn
 import mindspore.ops as ops
 import mindspore.numpy as mnp
 import mindspore.common.dtype as mstype
 from mindspore import Parameter, Tensor
-# add data parallel
-from mindspore.common.initializer import initializer
-from .utils import activation_map
-from .layers import Dense, Embedding
-from .config import BertConfig
+from mindspore.common.initializer import initializer, TruncatedNormal
+
+activation_map = {
+    'relu': nn.ReLU(),
+    'gelu': nn.GELU(False),
+    'gelu_approximate': nn.GELU(),
+    'swish':nn.SiLU()
+}
 
 class BertEmbeddings(nn.Cell):
     """
@@ -17,9 +18,9 @@ class BertEmbeddings(nn.Cell):
     """
     def __init__(self, config):
         super().__init__()
-        self.word_embeddings = Embedding(config.vocab_size, config.hidden_size)
-        self.position_embeddings = Embedding(config.max_position_embeddings, config.hidden_size)
-        self.token_type_embeddings = Embedding(config.type_vocab_size, config.hidden_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, embedding_table=TruncatedNormal(config.initializer_range))
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size, embedding_table=TruncatedNormal(config.initializer_range))
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size, embedding_table=TruncatedNormal(config.initializer_range))
         self.layer_norm = nn.LayerNorm((config.hidden_size,), epsilon=config.layer_norm_eps)
         self.dropout = nn.Dropout(1 - config.hidden_dropout_prob)
 
@@ -56,9 +57,9 @@ class BertSelfAttention(nn.Cell):
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = Dense(config.hidden_size, self.all_head_size)
-        self.key = Dense(config.hidden_size, self.all_head_size)
-        self.value = Dense(config.hidden_size, self.all_head_size)
+        self.query = nn.Dense(config.hidden_size, self.all_head_size, weight_init=TruncatedNormal(config.initializer_range))
+        self.key = nn.Dense(config.hidden_size, self.all_head_size, weight_init=TruncatedNormal(config.initializer_range))
+        self.value = nn.Dense(config.hidden_size, self.all_head_size, weight_init=TruncatedNormal(config.initializer_range))
 
         self.dropout = nn.Dropout(1 - config.attention_probs_dropout_prob)
         self.softmax = nn.Softmax(-1)
@@ -106,7 +107,7 @@ class BertSelfAttention(nn.Cell):
 class BertSelfOutput(nn.Cell):
     def __init__(self, config):
         super(BertSelfOutput, self).__init__()
-        self.dense = Dense(config.hidden_size, config.hidden_size)
+        self.dense = nn.Dense(config.hidden_size, config.hidden_size, weight_init=TruncatedNormal(config.initializer_range))
         self.layer_norm = nn.LayerNorm((config.hidden_size,), epsilon=1e-12)
         self.dropout = nn.Dropout(1 - config.hidden_dropout_prob)
 
@@ -131,7 +132,7 @@ class BertAttention(nn.Cell):
 class BertIntermediate(nn.Cell):
     def __init__(self, config):
         super(BertIntermediate, self).__init__()
-        self.dense = Dense(config.hidden_size, config.intermediate_size)
+        self.dense = nn.Dense(config.hidden_size, config.intermediate_size, weight_init=TruncatedNormal(config.initializer_range))
         self.intermediate_act_fn = activation_map.get(config.hidden_act, nn.GELU(False))
 
     def construct(self, hidden_states):
@@ -142,7 +143,7 @@ class BertIntermediate(nn.Cell):
 class BertOutput(nn.Cell):
     def __init__(self, config):
         super(BertOutput, self).__init__()
-        self.dense = Dense(config.intermediate_size, config.hidden_size)
+        self.dense = nn.Dense(config.intermediate_size, config.hidden_size, weight_init=TruncatedNormal(config.initializer_range))
         self.layer_norm = nn.LayerNorm((config.hidden_size,), epsilon=1e-12)  
         self.dropout = nn.Dropout(1 - config.hidden_dropout_prob)
 
@@ -200,7 +201,7 @@ class BertEncoder(nn.Cell):
 class BertPooler(nn.Cell):
     def __init__(self, config):
         super(BertPooler, self).__init__()
-        self.dense = Dense(config.hidden_size, config.hidden_size, activation='tanh')
+        self.dense = nn.Dense(config.hidden_size, config.hidden_size, activation='tanh', weight_init=TruncatedNormal(config.initializer_range))
     
     def construct(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding.
@@ -212,7 +213,7 @@ class BertPooler(nn.Cell):
 class BertPredictionHeadTransform(nn.Cell):
     def __init__(self, config):
         super().__init__()
-        self.dense = Dense(config.hidden_size, config.hidden_size)
+        self.dense = nn.Dense(config.hidden_size, config.hidden_size, weight_init=TruncatedNormal(config.initializer_range))
         self.transform_act_fn = activation_map.get(config.hidden_act, nn.GELU(False))
         self.layer_norm = nn.LayerNorm((config.hidden_size,), epsilon=config.layer_norm_eps)
     
@@ -229,7 +230,7 @@ class BertLMPredictionHead(nn.Cell):
 
         # The output weights are the same as the input embeddings, but there is
         # an output-only bias for each token.
-        self.decoder = Dense(config.hidden_size, config.vocab_size, has_bias=False)
+        self.decoder = nn.Dense(config.hidden_size, config.vocab_size, has_bias=False, weight_init=TruncatedNormal(config.initializer_range))
 
         self.bias = Parameter(initializer('zeros', config.vocab_size), 'bias')
 
@@ -248,7 +249,7 @@ class BertPreTrainingHeads(nn.Cell):
     def __init__(self, config):
         super(BertPreTrainingHeads, self).__init__()
         self.predictions = BertLMPredictionHead(config)
-        self.seq_relationship = Dense(config.hidden_size, 2)
+        self.seq_relationship = nn.Dense(config.hidden_size, 2, weight_init=TruncatedNormal(config.initializer_range))
     
     def construct(self, sequence_output, pooled_output, masked_lm_positions):
         prediction_scores = self.predictions(sequence_output, masked_lm_positions)

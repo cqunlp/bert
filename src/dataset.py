@@ -11,3 +11,5 @@ def read_bert_pretrain_mindrecord(batch_size, file_name, rank_id, rank_size):
     wiki_dataset = wiki_dataset.batch(batch_size, drop_remainder=True)
     total = wiki_dataset.get_dataset_size()
     return wiki_dataset, total
+
+

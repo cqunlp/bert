@@ -1,10 +1,7 @@
 import mindspore.nn as nn
 import mindspore
-import mindspore.dataset as ds
-import mindspore.dataset.transforms as transforms
-from mindspore.communication import init, get_rank, get_group_size
-
 import os
+import time
 import requests
 import tempfile
 import logging
@@ -131,22 +128,31 @@ def get_mindrecord_list(mindrecord_dir_list):
 
         mindrecord_list.append(list(map(_concat_mindrecord_path, mindrecord_files)))
     mindrecord_list = [b for a in mindrecord_list for b in a]
+    # print(mindrecord_list)
     return mindrecord_list
 
 # save ckpt func
-def save_bert_min_checkpoint(cur_epoch_nums,\
-                            cur_step_nums,\
+def save_bert_min_checkpoint(cur_step_nums,\
                             save_checkpoint_path,\
                             rank_num,\
                             network):
     per_card_save_model_path = ('bert-min_ckpt_'+\
-    'epoch_{}_'.format(cur_epoch_nums)+\
     'step_{}_'.format(cur_step_nums)+\
     'card_id_{}'.format(rank_num))
-    ckpt_save_dir = os.path.join(save_checkpoint_path,('card_id_' + str(rank_num)),\
-    per_card_save_model_path)
+    ckpt_save_dir = os.path.join(save_checkpoint_path, ('card_id_' + str(rank_num)),\
+                                 per_card_save_model_path)
+    card_path = os.path.join(save_checkpoint_path, 'card_id_' + '{rank_id}'.format(rank_id=rank_num))
+    if not os.path.exists(card_path):
+        os.mkdir(card_path)
+    if not os.path.exists(card_path):
+        os.mkdir(card_path)
     mindspore.save_checkpoint(save_obj=network,
                               ckpt_file_name=ckpt_save_dir,
                               integrated_save=True,
                               async_save=True)
 
+def get_output_file_time():
+    time_now = int(time.time()) - 1
+    time_local = time.localtime(time_now)
+    output_file_time = time.strftime("%Y_%m_%d_%H:%M:%S",time_local)
+    return output_file_time

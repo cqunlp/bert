@@ -5,11 +5,11 @@ from .utils import load_from_cache
 from .utils import get_mindrecord_list
 
 pretrain_mindrecord_list = [
-    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_aa/',
-    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ab/',
-    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ac/',
-    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ad/',
-    '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ae/',
+    '/data1/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_aa/',
+    '/data1/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ab/',
+    '/data1/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ac/',
+    '/data1/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ad/',
+    '/data1/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ae/',
 ]
 
 class PretrainedConfig:
@@ -27,8 +27,15 @@ class PretrainedConfig:
         self.train_batch_size = kwargs.pop('train_batch_size', 128)
         self.eval_batch_size = kwargs.pop('eval_batch_size', 128)
         self.do_save_ckpt = kwargs.pop('do_save_ckpt', True)
-        self.save_ckpt_path = kwargs.pop('save_ckpt_path', '/data0/bert/model_save')
-        self.epochs = kwargs.pop('epochs', 10)
+        self.jit = kwargs.pop('jit', True)
+        self.do_train = kwargs.pop('do_train', True)
+        self.do_eval = kwargs.pop('do_eval', True)
+        # self.save_ckpt_path = kwargs.pop('save_ckpt_path', os.path.join('')'/data0/bert/outputs/model_save')
+        self.save_steps = kwargs.pop('save_steps',1000)
+        self.epochs = kwargs.pop('epochs', 40)
+        self.lr = kwargs.pop('lr', 5e-5)
+        self.warmup = kwargs.pop('warmup',0.16)
+
         self.dataset_mindreocrd_dir = kwargs.pop('dataset_mindreocrd_dir',\
         get_mindrecord_list(pretrain_mindrecord_list))
 
