@@ -1,0 +1,54 @@
+# Builtin Configurations
+
+model_name: "fasttext"
+device_target: "GPU"
+
+PREPROCESS:
+  max_len: 2955
+  mid_dir_path: "./yelp_temp_data"
+  vocab_file_path: "./ckpt_yelp/vocab.txt"
+
+MODEL_PARAMETERS:
+  vocab_size: 6414979
+  embedding_dims: 16
+  num_class: 2
+
+OPTIMIZER:
+  function: "Adam"
+  lr: 0.3
+  min_lr: 0.000001
+  decay_steps: 549
+  warmup_steps: 400000
+  poly_lr_scheduler_power: 0.5
+
+TRAIN:
+  data_path: "xxx/train.csv"
+  batch_size: 2048
+  buckets: [64, 128, 256,512,2955]
+  epochs: 5
+  epoch_count: 1
+  loss_function: "SoftmaxCrossEntropyWithLogits"
+  pretrain_ckpt_dir: ""
+  save_ckpt_steps: 549
+  save_ckpt_dir: "./ckpt_yelp"
+  keep_ckpt_max: 10
+  run_distribute: False
+  distribute_batch_size_gpu: 512
+
+VALID:
+  data_path: "xxx/test.csv"
+  batch_size: 2048
+  model_ckpt: "./ckpt_yelp/fasttext-*_***.ckpt"
+  buckets: [256]
+
+INFER:
+  data_path: "xxx/test.csv"
+  batch_size: 512
+  model_ckpt: "./ckpt_yelp/fasttext-*_***.ckpt"
+  buckets: [256]
+
+EXPORT:
+  device_id: 0
+  ckpt_file: "./ckpt_yelp/fasttext-*_***.ckpt"
+  file_name: "fasttext"
+  file_format: "AIR"

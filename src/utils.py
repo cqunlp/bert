@@ -1,5 +1,4 @@
-import mindspore.nn as nn
-import mindspore
+import json
 import os
 import time
 import requests
@@ -9,7 +8,8 @@ import shutil
 from pathlib import Path
 from tqdm import tqdm
 from typing import IO
-from icecream import ic
+import mindspore.nn as nn
+import mindspore
 
 try:
     from pathlib import Path
@@ -132,11 +132,11 @@ def get_mindrecord_list(mindrecord_dir_list):
     return mindrecord_list
 
 # save ckpt func
-def save_bert_min_checkpoint(cur_step_nums,\
+def save_bert_small_checkpoint(cur_step_nums,\
                             save_checkpoint_path,\
                             rank_num,\
                             network):
-    per_card_save_model_path = ('bert-min_ckpt_'+\
+    per_card_save_model_path = ('bert_ckpt_'+\
     'step_{}_'.format(cur_step_nums)+\
     'card_id_{}'.format(rank_num))
     ckpt_save_dir = os.path.join(save_checkpoint_path, ('card_id_' + str(rank_num)),\
@@ -156,3 +156,8 @@ def get_output_file_time():
     time_local = time.localtime(time_now)
     output_file_time = time.strftime("%Y_%m_%d_%H:%M:%S",time_local)
     return output_file_time
+
+def get_json_config(config_path):
+    with open(config_path, 'r', encoding="utf-8") as config_file:
+        json_data = json.load(config_file)
+        return json_data

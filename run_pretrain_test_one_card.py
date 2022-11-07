@@ -6,7 +6,7 @@ from mindspore.ops import value_and_grad, cross_entropy
 from mindspore import nn
 
 from src.bert import BertForPretraining
-from src.config import BertConfig
+from src.config import BertConfig, PretrainedConfig
 
 from tqdm import tqdm
 
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     # 1. Read pre-train dataset.
     # train_dataset_path = '/data0/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_aa/wiki_00.mindrecord'
     # train_dataset = ds.MindDataset(dataset_files=train_dataset_path)
-    config = BertConfig()
+    config = PretrainedConfig()
     dataset_path = config.dataset_mindreocrd_dir
     train_dataset = ds.MindDataset(dataset_files=dataset_path, num_samples=2560)
     # 2. Batchify the dataset.
@@ -89,7 +89,8 @@ if __name__ == '__main__':
     train_dataset = train_dataset.batch(batch_size)
     # train_dataset = train_dataset.take(2)
     # 3. Define model.
-    config = BertConfig()
+    config_file = "config/bert_config_mini.json"
+    config = BertConfig(config_file)
     model = BertForPretraining(config)
 
     # model = auto_mixed_precision(model, "O3")

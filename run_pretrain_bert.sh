@@ -8,11 +8,12 @@ nohup mpirun -n 8 \
                   python run_pretrain.py \
                          --jit True \
                          --do_train True \
-                         --do_eval False \
-                         --lr 5e-5 \
+                         --lr 1e-5 \
                          --warmup_steps 10000 \
                          --train_batch_size 256 \
-                         --eval_batch_size 256 \
                          --epochs 10 \
                          --save_steps 10000 \
+                         --do_load_ckpt False \
+                         --model_path {$your_ckpt_path_if_you_need} \
+                         --config  {$your_config_json_file_path} \
                          >> ./outputs/${pretrain_file_name}_${time}.log 2>&1 &

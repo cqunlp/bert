@@ -1,16 +1,13 @@
-from cmath import isfinite
 import time
 import argparse
+import numpy as np
 import os
 import sys
-import logging
-from unittest import skip
-import numpy as np
 import mindspore
 import mindspore.dataset as ds
 import mindspore.nn as nn
 import mindspore.ops as ops
-from mindspore import ms_function, Tensor
+from mindspore import ms_function
 from mindspore.ops import value_and_grad, cross_entropy, clip_by_global_norm
 from mindspore.amp import all_finite
 from mindspore.communication import init, get_rank, get_group_size
@@ -18,8 +15,8 @@ from mindspore.parallel._utils import _get_device_num, _get_gradients_mean
 
 from src.bert import BertForPretraining
 from src.optimization import create_optimizer
-from src.config import BertConfig
-from src.utils import get_output_file_time, save_bert_min_checkpoint
+from src.config import BertConfig, PretrainedConfig
+from src.utils import get_output_file_time, save_bert_small_checkpoint
 
 # get pwd 
 def getpwd():
@@ -41,7 +38,7 @@ def train(model, optimizer, train_dataset, train_batch_size, jit=True, print_ite
                                        masked_lm_ids.view(-1), masked_lm_weights.view(-1))
         next_sentence_loss = cross_entropy(seq_relationship_score.view(-1, 2), next_sentence_label.view(-1))
         total_loss = masked_lm_loss + next_sentence_loss
-        
+
         return total_loss, masked_lm_loss, next_sentence_loss
 
     grad_fn = value_and_grad(forward_fn, None, optimizer.parameters, has_aux=True)
@@ -53,7 +50,7 @@ def train(model, optimizer, train_dataset, train_batch_size, jit=True, print_ite
         grads = clip_by_global_norm(grads, clip_norm=1.0)
         grads = grad_reducer(grads)
         status = all_finite(grads)
-        # # status = Tensor(True)
+        status = ops.AllReduce()(status)
         if status:
             total_loss = ops.depend(total_loss, optimizer(grads))
         return total_loss, masked_lm_loss, next_sentence_loss, status
@@ -69,13 +66,12 @@ def train(model, optimizer, train_dataset, train_batch_size, jit=True, print_ite
     cur_step_nums, train_step_nums, skip_step_nums = 0, 0, 0
     cur_time, avg_time = time.time(), 0
     # step begin
+    model.set_train()
     for input_ids, input_mask, masked_lm_ids, masked_lm_positions, masked_lm_weights, \
             next_sentence_label, segment_ids in train_dataset.create_tuple_iterator():
-        # s = time.time()
         total_loss, masked_lm_loss, next_sentence_loss, status = \
             train_step(input_ids, input_mask, masked_lm_ids, masked_lm_positions, masked_lm_weights, \
                        next_sentence_label, segment_ids)
-        # print(time.time() - s)
         status = status.asnumpy()
         if status:
             loss_total = loss_total + total_loss.asnumpy()
@@ -100,11 +96,11 @@ def train(model, optimizer, train_dataset, train_batch_size, jit=True, print_ite
                 f"masked_lm_loss: {masked_lm_loss_total/cur_step_nums:f}, "
                 f"next_sentence_loss: {next_sentence_loss_toal/cur_step_nums:f}")
 
-        # saving ckpt per 1000 steps or last step
+        # saving ckpt per 10000 steps or last step
         if args.do_save_ckpt:
             if (train_step_nums % args.save_steps == 0 or cur_step_nums == total - 1) and cur_step_nums != 0:
                 print(f"saving ckpt on cur_step: {cur_step_nums}, train_step: {train_step_nums}, in card: {rank_id}")
-                save_bert_min_checkpoint(cur_step_nums=train_step_nums,
+                save_bert_small_checkpoint(cur_step_nums=train_step_nums,
                                          save_checkpoint_path=args.save_ckpt_path,
                                          rank_num=rank_id,
                                          network=model)
@@ -123,7 +119,7 @@ def init_args():
             os.mkdir(output_file)
         except FileExistsError:
             pass
-
+    # the follow are pretrain basic setting
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", default=config.dataset_mindreocrd_dir, type=str,\
                         help="Using data path for mindrecord.")
@@ -131,16 +127,12 @@ def init_args():
                         help="Choose jit mode.")
     parser.add_argument("--do_train", default=config.do_train, type=bool,\
                         help="Whether to run training.")
-    parser.add_argument("--do_eval", default=config.do_eval, type=bool,\
-                        help="Whether to run training.")
     parser.add_argument("--lr", default=config.lr, type=float, required=True,\
                         help="Learning rate for training.")
-    parser.add_argument("--warmup_steps", default=config.warmup, type=int, required=True,\
+    parser.add_argument("--warmup_steps", default=config.warmup_steps, type=int, required=True,\
                         help="Warm up steps.")
     parser.add_argument("--train_batch_size", default=config.train_batch_size, type=int, required=True,\
                         help="Choose train batch size.")
-    parser.add_argument("--eval_batch_size", default=config.eval_batch_size, type=int, required=True,\
-                        help="Choose eval batch size.")
     parser.add_argument("--epochs", default=config.epochs, type=int, required=True,\
                         help="Choose training epochs value.")
     parser.add_argument("--do_save_ckpt", default=config.do_save_ckpt, type=str,\
@@ -149,8 +141,12 @@ def init_args():
                         help="How many steps need to save ckpt.")
     parser.add_argument("--save_ckpt_path", default=output_file, type=str,\
                         help="Ckpt save path.")
+    parser.add_argument("--do_load_ckpt", default='False', type=str, required=True,\
+                        help="Whether need to load ckpt.")
     parser.add_argument("--model_path", default=None, type=str,\
                         help="Ckpt path to load.")
+    parser.add_argument("--config", default=None, type=str,required=True,\
+                        help="config path to load.")
 
     if not os.path.exists('./outputs'):
         os.mkdir('./outputs')
@@ -168,21 +164,29 @@ if __name__ == '__main__':
                                         device_num = rank_size,
                                         gradients_mean = True)
     mindspore.set_context(enable_graph_kernel=True)
-    config = BertConfig()
+    config = PretrainedConfig()
     args = init_args()
-
+    config = BertConfig(args.config)
+    
+    
     # 1. Read pre-train dataset.
     dataset_path = args.data_dir
     train_dataset = ds.MindDataset(dataset_files=dataset_path, num_shards=rank_size, shard_id=rank_id)
-
     # 2. Batchify the dataset.
     train_dataset = train_dataset.batch(args.train_batch_size, drop_remainder=True)
     train_dataset = train_dataset.repeat(args.epochs)
 
     # 3. Define model.
-    config = BertConfig()
+    config = BertConfig(args.config)
     model = BertForPretraining(config)
-
+    # load ckpt
+    if args.do_load_ckpt == 'True':
+        if args.model_path is not None:
+            ckpt_file = args.model_path
+            bert_dict = mindspore.load_checkpoint(ckpt_file)
+            mindspore.load_param_into_net(model, bert_dict)
+        else:
+            raise ValueError("Need to input checkout file")
     # 4. Define optimizer(trick: warm up).
     num_train_steps = train_dataset.get_dataset_size()
     optimizer = create_optimizer(model, args.lr, num_train_steps, args.warmup_steps)
