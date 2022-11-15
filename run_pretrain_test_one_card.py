@@ -2,9 +2,10 @@ import time
 import mindspore
 import mindspore.dataset as ds
 from mindspore import ms_function, log, mutable
-from mindspore.ops import value_and_grad, cross_entropy
+from mindspore.ops import cross_entropy
 from mindspore import nn
 
+from src.api import value_and_grad
 from src.bert import BertForPretraining
 from src.config import BertConfig
 
