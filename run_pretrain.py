@@ -45,11 +45,12 @@ def train(model, optimizer, loss_scaler, grad_reducer, train_dataset, train_batc
 
     def train_step(input_ids, input_mask, masked_lm_ids, masked_lm_positions, masked_lm_weights, \
                    next_sentence_label, segment_ids):
+        reg = init_register()
         (total_loss, masked_lm_loss, next_sentence_loss), grads = grad_fn(input_ids, input_mask, segment_ids, \
                               masked_lm_ids, masked_lm_positions, masked_lm_weights, next_sentence_label)
         grads = clip_by_global_norm(grads, clip_norm=1.0)
         grads = grad_reducer(grads)
-        status = all_finite(grads)
+        status = all_finite(grads, reg)
         if status:
             total_loss = loss_scaler.unscale(total_loss)
             grads = loss_scaler.unscale(grads)
@@ -195,7 +196,7 @@ if __name__ == '__main__':
     model = BertForPretraining(config)
 
     # use amp
-    from src.amp import all_finite, auto_mixed_precision, DynamicLossScaler, NoLossScaler
+    from src.amp import all_finite, auto_mixed_precision, DynamicLossScaler, NoLossScaler, init_register
     if args.amp:
         model = auto_mixed_precision(model, 'O1')
         loss_scaler = DynamicLossScaler(65536, 2, 1000)

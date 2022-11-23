@@ -105,15 +105,17 @@ gpu_float_status = ops.FloatStatus()
 npu_alloc_float_status = ops.NPUAllocFloatStatus()
 npu_clear_float_status = ops.NPUClearFloatStatus()
 npu_get_float_status = ops.NPUGetFloatStatus()
-if ascend_target:
-    status = npu_alloc_float_status()
-    _ = npu_clear_float_status(status)
-else:
-    status = None
 
 hypermap = ops.HyperMap()
 partial = ops.Partial()
 
+def init_register():
+    if ascend_target:
+        status = npu_alloc_float_status()
+        _ = npu_clear_float_status(status)
+    else:
+        status = None
+    return status
 
 def grad_unscale(scale, grad):
     """grad unscale."""
@@ -130,7 +132,7 @@ def is_finite(inputs):
     status = ops.isfinite(inputs)
     return status.all()
 
-def all_finite(inputs):
+def all_finite(inputs, status):
     """whether all inputs tensor are finite."""
     if ascend_target:
         status = ops.depend(status, inputs)
