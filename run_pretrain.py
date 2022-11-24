@@ -2,6 +2,7 @@ import time
 import argparse
 import os
 import sys
+import zipfile
 import mindspore
 import mindspore.dataset as ds
 import mindspore.nn as nn
@@ -16,6 +17,10 @@ from src.bert import BertForPretraining
 from src.config import BertConfig, PretrainedConfig
 from src.optimization import create_optimizer
 from src.utils import get_output_file_time, save_bert_small_checkpoint
+from src.moxing_adapter import sync_data
+
+device_id = int(os.getenv('DEVICE_ID', "0"))
+device_num = int(os.getenv('RANK_SIZE', "0"))
 
 # get pwd 
 def getpwd():
@@ -31,7 +36,7 @@ def train(model, optimizer, loss_scaler, grad_reducer, train_dataset, train_batc
     # 5. Define forward and grad function.
     def forward_fn(input_ids, input_mask, segment_ids, \
                    masked_lm_ids, masked_lm_positions, masked_lm_weights, next_sentence_label):
-        (prediction_scores, seq_relationship_score, _) = model(input_ids, input_mask, segment_ids, None, None, masked_lm_positions)
+        (prediction_scores, seq_relationship_score) = model(input_ids, input_mask, segment_ids, None, None, masked_lm_positions)
 
         masked_lm_loss = cross_entropy(prediction_scores.view(-1, prediction_scores.shape[-1]),
                                        masked_lm_ids.view(-1), masked_lm_weights.view(-1))
@@ -45,17 +50,18 @@ def train(model, optimizer, loss_scaler, grad_reducer, train_dataset, train_batc
 
     def train_step(input_ids, input_mask, masked_lm_ids, masked_lm_positions, masked_lm_weights, \
                    next_sentence_label, segment_ids):
-        reg = init_register()
+        status = init_register()
+        input_ids = ops.depend(input_ids, status)
         (total_loss, masked_lm_loss, next_sentence_loss), grads = grad_fn(input_ids, input_mask, segment_ids, \
                               masked_lm_ids, masked_lm_positions, masked_lm_weights, next_sentence_label)
         grads = clip_by_global_norm(grads, clip_norm=1.0)
         grads = grad_reducer(grads)
-        status = all_finite(grads, reg)
+        status = all_finite(grads, status)
         if status:
             total_loss = loss_scaler.unscale(total_loss)
             grads = loss_scaler.unscale(grads)
             total_loss = ops.depend(total_loss, optimizer(grads))
-        loss_scaler.adjust(status)
+        total_loss = ops.depend(total_loss, loss_scaler.adjust(status))
         return total_loss, masked_lm_loss, next_sentence_loss, status
 
     if jit:
@@ -111,6 +117,10 @@ def train(model, optimizer, loss_scaler, grad_reducer, train_dataset, train_batc
             train_step_nums += 1
         cur_step_nums += 1
     print("Pretrain done!")
+    if args.is_modelarts.lower() == 'true':
+        import moxing as mox
+        if device_id == 0:
+            mox.file.copy_parallel(args.save_ckpt_path, os.path.join(args.train_url))
 
 def str2bool(str):
     return True if str.lower() == 'true' else False
@@ -121,7 +131,7 @@ def init_args():
     output_file = os.path.join(getpwd(), 'outputs' ,'model_save_' + output_file_time)
     if not os.path.exists(output_file):
         try:
-            os.mkdir(output_file)
+            os.makedirs(output_file)
         except FileExistsError:
             pass
 
@@ -158,6 +168,10 @@ def init_args():
 
     if not os.path.exists('./outputs'):
         os.mkdir('./outputs')
+    
+    parser.add_argument('--data_url', type=str, default="", help='')
+    parser.add_argument('--train_url', type=str, default="", help='')
+    parser.add_argument('--is_modelarts', type=str, default="true", help='')
 
     args = parser.parse_args()
     if not os.path.exists(args.save_ckpt_path):
@@ -165,6 +179,7 @@ def init_args():
     return args
 
 if __name__ == '__main__':
+    mindspore.set_context(device_target="Ascend")
     args = init_args()
     config = BertConfig(args.config)
     device_target = args.device_target.lower()
@@ -186,7 +201,24 @@ if __name__ == '__main__':
     # dataset_path = args.data_dir
     # new dataset path is merge_and_save_mindrecord
     # dataset_path = ['merge_and_save_mindrecord/bert_pretrain_data.mindrecord{index}'.format(index=i) for i in range(8)]
-    dataset_path = 'test_data/wiki_00.mindrecord'
+    if args.is_modelarts.lower() == 'true':
+        data_url = args.data_url
+        local_data_path = '/cache/data'
+        os.makedirs(local_data_path, exist_ok=True)
+        sync_data(data_url, local_data_path, threads=25)
+        print(f"local_data_path{os.listdir(local_data_path)}")
+        if "bert_pretrain_data.mindrecord0" in os.listdir(local_data_path):
+            dataset_path = [os.path.join(local_data_path, 'bert_pretrain_data.mindrecord{index}'.format(index=i)) for i in range(8)]
+            print(dataset_path)
+        elif "128.zip" in os.listdir(local_data_path):
+            zip_file = zipfile.ZipFile(os.path.join(local_data_path, '128.zip'))
+            for file in zip_file.namelist():
+                zip_file.extract(file, local_data_path)
+                dataset_path = [os.path.join(local_data_path, 'bert_pretrain_data.mindrecord{index}'.format(index=i)) for i in range(8)]
+        else:
+            exit(1)
+    else:
+        dataset_path = 'test_data/wiki_00.mindrecord'
     train_dataset = ds.MindDataset(dataset_files=dataset_path, num_shards=rank_size, shard_id=rank_id)
     # 2. Batchify the dataset.
     train_dataset = train_dataset.batch(args.train_batch_size, drop_remainder=True)
@@ -199,7 +231,7 @@ if __name__ == '__main__':
     from src.amp import all_finite, auto_mixed_precision, DynamicLossScaler, NoLossScaler, init_register
     if args.amp:
         model = auto_mixed_precision(model, 'O1')
-        loss_scaler = DynamicLossScaler(65536, 2, 1000)
+        loss_scaler = DynamicLossScaler(1024, 2, 1000)
     else:
         loss_scaler = NoLossScaler()
     # load ckpt

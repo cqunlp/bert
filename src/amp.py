@@ -112,7 +112,8 @@ partial = ops.Partial()
 def init_register():
     if ascend_target:
         status = npu_alloc_float_status()
-        _ = npu_clear_float_status(status)
+        clear_status = npu_clear_float_status(status)
+        status = ops.depend(status, clear_status)
     else:
         status = None
     return status
@@ -139,7 +140,7 @@ def all_finite(inputs, status):
         get_status = npu_get_float_status(status)
         status = ops.depend(status, get_status)
         status_finite = status.sum() == 0
-        _ = npu_clear_float_status(status)
+        # _ = npu_clear_float_status(status)
         return status_finite
     outputs = hypermap(partial(is_finite), inputs)
     return ops.stack(outputs).all()
