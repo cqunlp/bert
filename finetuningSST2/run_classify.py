@@ -8,6 +8,7 @@ import mindspore
 from mindspore import context
 from mindspore import nn
 from mindspore import ops
+from mindspore import dataset
 from src.config import BertConfig
 from src.optimization import BertLearningRate
 from model import BertBinaryClassificationModel
@@ -19,10 +20,10 @@ def getpwd():
         pwd = os.path.dirname(pwd)
     return pwd
 
-def get_sst2_dataset(dataset_path, bacth_size):
+def get_sst2_dataset(dataset_path, bacth_size, max_length):
     dataset = SST2Dataset(paths=dataset_path,
                       tokenizer="bert-base-uncased",
-                      max_length=128,
+                      max_length=max_length,
                       truncation_strategy=True,
                       columns_list=['input_ids', 'token_type_ids', 'attention_mask', 'label'],
                       test_columns_list=['input_ids', 'token_type_ids', 'attention_mask'],
@@ -30,9 +31,14 @@ def get_sst2_dataset(dataset_path, bacth_size):
     sst_2_ds = dataset()
     train_dataset = sst_2_ds['train']
     # test_dataset haven't label cause it only work for interface
-    test_dataset = sst_2_ds['test']
-    dev_dataset = sst_2_ds['dev']
-    return train_dataset, dev_dataset, test_dataset
+    test_dataset = sst_2_ds['dev']
+    # train_dataset_path = "{data_path}/SST2_mr/sst_2_train_data.mindrecord".format(data_path=dataset_path)
+    # test_dataset_path = "{data_path}/SST2_mr/sst_2_test_data.mindrecord".format(data_path=dataset_path)
+    # train_dataset = dataset.MindDataset(dataset_files=train_dataset_path)
+    # test_dataset = dataset.MindDataset(dataset_files=test_dataset_path)
+    # train_dataset = train_dataset.batch(bacth_size, drop_remainder=True)
+    # test_dataset = test_dataset.batch(bacth_size, drop_remainder=True)
+    return train_dataset, test_dataset
 
 def init_sst2_args():
     parser = argparse.ArgumentParser()
@@ -42,14 +48,16 @@ def init_sst2_args():
                         help="Choose dataset path.")
     parser.add_argument("--config", type=str, required=True,\
                         help="Choose bert config file.")
-    parser.add_argument("--output", default= os.path.join(getpwd(), "outputs"), type=str,\
-                        help="Choose learning rate.")
+    # parser.add_argument("--output", default= os.path.join(getpwd(), "outputs"), type=str,\
+    #                     help="Choose outputs path.")
     parser.add_argument("--batch_size", default=16, type=int, required=True,\
                         help="Choose batch size.")
     parser.add_argument("--epochs", default=10, type=int, required=True,\
                         help="Choose training epochs value.")
-    parser.add_argument("--lr", default=5e-5, type=float, required=True,\
+    parser.add_argument("--lr", default=2e-5, type=float, required=True,\
                         help="Choose learning rate.")
+    parser.add_argument("--max_length", default=64, type=int,\
+                        help="Choose max length.")
     parser.add_argument("--acc", default=85, type=float, \
                         help="Choose accuracy need to save.")
     args = parser.parse_args()
@@ -145,7 +153,12 @@ if __name__ == "__main__":
     bert_sst_2 = BertBinaryClassificationModel(config, ckpt_file)
     params = bert_sst_2.trainable_params()
     # get datset
-    train_dataset ,test_dataset, _ = get_sst2_dataset(args.dataset_path, args.batch_size)
+    try:
+        train_dataset, test_dataset = get_sst2_dataset(args.dataset_path, args.batch_size, args.max_length)
+    except ModuleNotFoundError:
+        os.system('pip install -r ../requirements.txt')
+        train_dataset, test_dataset = get_sst2_dataset(args.dataset_path, args.batch_size, args.max_length)
+
     lr_schedule = BertLearningRate(learning_rate=args.lr,
                                    end_learning_rate=0.0,
                                    warmup_steps=int(train_dataset.get_dataset_size() * epoch_num * 0.1),

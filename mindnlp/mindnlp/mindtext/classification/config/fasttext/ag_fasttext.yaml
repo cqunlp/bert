@@ -1,0 +1,54 @@
+# Builtin Configurations
+
+model_name: "fasttext"
+device_target: "GPU"
+
+PREPROCESS:
+  max_len: 467
+  mid_dir_path: "./ag_temp_data"
+  vocab_file_path: "./ckpt_ag/vocab.txt"
+
+MODEL_PARAMETERS:
+  vocab_size: 1383812
+  embedding_dims: 16
+  num_class: 4
+
+OPTIMIZER:
+  function: "Adam"
+  lr: 0.2
+  min_lr: 0.000001
+  decay_steps: 236
+  warmup_steps: 400000
+  poly_lr_scheduler_power: 0.001
+
+TRAIN:
+  data_path: "xxx/train.csv"
+  batch_size: 512
+  buckets: [64, 128, 467]
+  epochs: 5
+  epoch_count: 1
+  loss_function: "SoftmaxCrossEntropyWithLogits"
+  pretrain_ckpt_dir: ""
+  save_ckpt_steps: 116
+  save_ckpt_dir: "./ckpt_ag"
+  keep_ckpt_max: 10
+  run_distribute: False
+  distribute_batch_size_gpu: 64
+
+VALID:
+  data_path: "xxx/test.csv"
+  batch_size: 512
+  model_ckpt: "./ckpt_ag/fasttext-*_***.ckpt"
+  buckets: [467]
+
+INFER:
+  data_path: "xxx/test.csv"
+  batch_size: 512
+  model_ckpt: "./ckpt_ag/fasttext-*_***.ckpt"
+  buckets: [467]
+
+EXPORT:
+  device_id: 0
+  ckpt_file: "./ckpt_ag/fasttext-*_***.ckpt"
+  file_name: "fasttext"
+  file_format: "AIR"

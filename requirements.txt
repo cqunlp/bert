@@ -1,6 +1,5 @@
 PyYAML==5.4.1
 scikit_learn==0.24.1
-pip
 pandas==1.2.4
 transformers==4.10.0
 spacy==3.1.2
@@ -8,5 +7,3 @@ datasets==1.12.0
 tqdm==4.62.2
 requests==2.25.1
 numpy==1.21.2
-mindspore-gpu==1.9.0
-ipykernal
