@@ -8,6 +8,7 @@ fi
 if [ ! -d "/finetuningSST2/result_log" ]; then
        mkdir finetuningSST2/result_log
 fi
+
 cd finetuningSST2
 nohup python run_classify.py \
     --bert_ckpt checkpoint/bert_ckpt_step_170000_card_id_7.ckpt \
