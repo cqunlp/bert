@@ -25,7 +25,6 @@ class BertBinaryClassificationModel(nn.Cell):
                             token_type_ids=token_type_ids,
                             position_ids=position_ids, 
                             head_mask=head_mask)
-
         pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -34,6 +33,11 @@ class BertBinaryClassificationModel(nn.Cell):
 
         if label is not None:
             loss_fct = nn.CrossEntropyLoss()
+            # print(logits.shape,label.shape,label.view(-1).shape)
+            # label.view(-1) == (1024,) 
+            # logits == (16, 2)
+            # before (16, 2) (16, 1) (16,)
+            # after (16, 2) (16, 64) (1024,)
             loss = loss_fct(logits.view(-1, 2), label.view(-1))
             outputs = (loss,) + outputs
 
