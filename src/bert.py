@@ -12,6 +12,10 @@ activation_map = {
     'swish':nn.SiLU()
 }
 
+class Matmul(nn.Cell):
+    def construct(self, a, b):
+        return ops.matmul(a, b)
+
 class BertEmbeddings(nn.Cell):
     """
     Embeddings for BERT, include word, position and token_type
@@ -63,6 +67,7 @@ class BertSelfAttention(nn.Cell):
 
         self.dropout = nn.Dropout(1 - config.attention_probs_dropout_prob)
         self.softmax = nn.Softmax(-1)
+        self.matmul = Matmul()
 
     def transpose_for_scores(self, x):
         new_x_shape = x.shape[:-1] + (self.num_attention_heads, self.attention_head_size)
@@ -80,7 +85,7 @@ class BertSelfAttention(nn.Cell):
         value_layer = self.transpose_for_scores(mixed_value_layer)
 
         # Take the dot product between "query" snd "key" to get the raw attention scores.
-        attention_scores = ops.matmul(query_layer, key_layer.swapaxes(-1, -2))
+        attention_scores = self.matmul(query_layer, key_layer.swapaxes(-1, -2))
         attention_scores = attention_scores / ops.sqrt(Tensor(self.attention_head_size, mstype.float32))
         # Apply the attention mask is (precommputed for all layers in BertModel forward() function)
         if attention_mask is not None:
@@ -96,7 +101,7 @@ class BertSelfAttention(nn.Cell):
         if head_mask is not None:
             attention_probs = attention_probs * head_mask
         
-        context_layer = ops.matmul(attention_probs, value_layer)
+        context_layer = self.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose(0, 2, 1, 3)
         new_context_layer_shape = context_layer.shape[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)

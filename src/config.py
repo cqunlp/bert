@@ -5,6 +5,7 @@ from .utils import load_from_cache
 from .utils import get_mindrecord_list
 from .utils import get_json_config
 
+# define your mindrecord dataset path
 pretrain_mindrecord_list = [
     '/data1/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_aa/',
     '/data1/dataset/bert_pretrain/bert/src/generate_mindrecord/9_15_wiki/mr_ab/',
@@ -16,8 +17,6 @@ pretrain_mindrecord_list = [
 class PretrainedConfig:
     """
     Pretrained Config.
-    Args:
-        xxx
     """
     pretrained_config_archive = {}
     def __init__(self, **kwargs):
@@ -26,19 +25,16 @@ class PretrainedConfig:
         self.output_attentions = kwargs.pop('output_attentions', False)
         self.output_hidden_states = kwargs.pop('output_hidden_states', False)
         self.train_batch_size = kwargs.pop('train_batch_size', 128)
-        self.eval_batch_size = kwargs.pop('eval_batch_size', 128)
         self.do_save_ckpt = kwargs.pop('do_save_ckpt', True)
         self.jit = kwargs.pop('jit', True)
         self.do_train = kwargs.pop('do_train', True)
-        self.do_eval = kwargs.pop('do_eval', True)
         # self.save_ckpt_path = kwargs.pop('save_ckpt_path', os.path.join('')'/data0/bert/outputs/model_save')
-        self.save_steps = kwargs.pop('save_steps',1000)
+        self.save_steps = kwargs.pop('save_steps',10000)
         self.epochs = kwargs.pop('epochs', 40)
-        self.lr = kwargs.pop('lr', 5e-5)
-        self.warmup = kwargs.pop('warmup',0.16)
-
-        #self.dataset_mindreocrd_dir = kwargs.pop('dataset_mindreocrd_dir',\
-        #get_mindrecord_list(pretrain_mindrecord_list))
+        self.lr = kwargs.pop('lr', 1e-5)
+        self.warmup_steps = kwargs.pop('warmup_steps', 10000)
+        # self.dataset_mindreocrd_dir = kwargs.pop('dataset_mindreocrd_dir',\
+        # get_mindrecord_list(pretrain_mindrecord_list))
 
     @classmethod
     def load(cls, pretrained_model_name_or_path, **kwargs):
@@ -103,23 +99,6 @@ class BertConfig(PretrainedConfig):
     """Configuration for BERT
     """
     pretrained_config_archive = CONFIG_ARCHIVE_MAP
-    # def __init__(self,
-    #              vocab_size=30522,
-    #              #hidden_size=512,
-    #              hidden_size=256,
-    #              num_hidden_layers=4,
-    #              num_attention_heads=4,
-    #             # num_attention_heads=8,
-    #              intermediate_size=1024,
-    #             # intermediate_size=2048,
-    #              hidden_act="gelu",
-    #              hidden_dropout_prob=0.1,
-    #              attention_probs_dropout_prob=0.1,
-    #              max_position_embeddings=512,
-    #              type_vocab_size=2,
-    #              initializer_range=0.02,
-    #              layer_norm_eps=1e-12,
-    #              **kwargs):
     def __init__(self, bert_config, **kwargs):
         super().__init__(**kwargs)
         bert_config_data = get_json_config(bert_config)

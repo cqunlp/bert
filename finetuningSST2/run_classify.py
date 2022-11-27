@@ -15,6 +15,10 @@ from src.optimization import BertLearningRate
 from model import BertBinaryClassificationModel
 # from mindnlp.mindnlp.mindtext.dataset.classification.sst import SST2Dataset
 
+
+def str2bool(str):
+    return True if str.lower() == 'true' else False
+
 def getpwd():
     pwd = sys.path[0]
     if os.path.isfile(pwd):
@@ -41,6 +45,10 @@ def get_sst2_dataset(dataset_path, train_batch_size, test_batch_size, max_length
 
 def init_sst2_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--device_target", default='Ascend', type=str, \
+                        help="Backend device.") 
+    parser.add_argument("--amp", default='True', type=str2bool, required=True,\
+                        help="whether use amp.")
     parser.add_argument("--bert_ckpt", type=str, required=True,\
                         help="Choose pretrain bert ckpt path.")
     parser.add_argument("--dataset_path", default='sst-2', type=str,\
@@ -104,15 +112,15 @@ def test_loop(model,
 
     return 100*correct
 
-def train_and_test(model, train_dataset, dev_dataset, optimizer, current_epoch):
+def train_and_test(model, loss_scaler, train_dataset, dev_dataset, optimizer, current_epoch):
+    global save_time
     save_description = "epoch{}-max_len{}-train_bs{}-test_bs{}-lr{}-time{}".format(
         args.epochs,
         args.max_length,
         args.train_batch_size,
         args.test_batch_size,
         args.lr,
-        time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
-    )
+        save_time)
     output_file = os.path.join(getpwd(), "outputs", save_description)
     if not os.path.exists(output_file):
         try:
@@ -125,24 +133,44 @@ def train_and_test(model, train_dataset, dev_dataset, optimizer, current_epoch):
                         attention_mask=attention_mask.squeeze(-2),
                         token_type_ids=token_type_ids.squeeze(-2),
                         label=label.squeeze(-2))
+        # 混合精度加这一条
+        loss = loss_scaler.scale(loss)
+
         return loss, logits
     grad_fn = ops.value_and_grad(forward_fn, None, optimizer.parameters, has_aux=True)
 
     def train_step(input_ids, attention_mask, token_type_ids, label):
+        status = init_register()
+        input_ids = ops.depend(input_ids, status)
         (loss, _), grads = grad_fn(input_ids, attention_mask, token_type_ids, label)
-        loss = ops.depend(loss, optimizer(grads))
-        return loss
+        # 混合精度需要
+        status = all_finite(grads, status)
+        if status:
+            loss = loss_scaler.unscale(loss)
+            grads = loss_scaler.unscale(grads)
+            loss = ops.depend(loss, optimizer(grads))
+        loss = ops.depend(loss, loss_scaler.adjust(status))
+
+        return loss, status
 
     size = train_dataset.get_dataset_size()
+    # 修改loss
+    loss_total = 0
     batch_size = train_dataset.get_batch_size()
     model.set_train(True)
 
     with tqdm(total=size * batch_size) as t:
         for batch, data in enumerate(train_dataset.create_dict_iterator()):
             t.set_description('Epoch %i' % current_epoch)
-            loss = train_step(data['input_ids'], data['attention_mask'], data['token_type_ids'], data['label'])
+            loss, status = train_step(data['input_ids'], data['attention_mask'], data['token_type_ids'], data['label'])
+            status = status.asnumpy()
+            if status:
+                loss_total = loss_total + loss.asnumpy()
+            else:
+                print(f"grads overflow, skip step")
+        
             loss, current = loss.asnumpy(), batch
-            t.set_postfix(loss=loss)
+            t.set_postfix(loss=loss_total/current)
             # if batch % 10 == 0:
             #     loss, current = loss.asnumpy(), batch
             #     print(f"loss: {loss:>7f}  [{current:>3d}/{size:>3d}]")
@@ -162,6 +190,8 @@ def check_save_sst2_ckpt(test_dataset, config, sst2_ckpt):
     print('The ckpt acc is: ',acc)
 
 if __name__ == "__main__":
+    mindspore.set_context(device_target="Ascend")
+    save_time = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
     args = init_sst2_args()
     try:
         import zipfile
@@ -180,6 +210,15 @@ if __name__ == "__main__":
     ckpt_file = args.bert_ckpt
     config = BertConfig(args.config)
     bert_sst_2 = BertBinaryClassificationModel(config, ckpt_file)
+
+    # use amp
+    from src.amp import all_finite, auto_mixed_precision, DynamicLossScaler, NoLossScaler, init_register
+    if args.amp:
+        model = auto_mixed_precision(bert_sst_2, 'O1')
+        loss_scaler = DynamicLossScaler(1024, 2, 1000)
+    else:
+        loss_scaler = NoLossScaler()
+
     params = bert_sst_2.trainable_params()
     # get datset
     train_dataset ,test_dataset = get_sst2_dataset(args.dataset_path, args.train_batch_size, args.test_batch_size, args.max_length)
@@ -191,7 +230,7 @@ if __name__ == "__main__":
     optimizer = nn.AdamWeightDecay(params, lr_schedule, eps=1e-8)
     for epoch in range(epoch_num):
         print(f"Epoch {epoch+1}\n-------------------------------")
-        train_and_test(bert_sst_2, train_dataset, test_dataset, optimizer, epoch+1)
+        train_and_test(bert_sst_2, loss_scaler, train_dataset, test_dataset, optimizer, epoch+1)
     print("Done! Best Accuracy is:", best_accuracy)
     # only test for fine-tuning
     # check_save_sst2_ckpt(test_dataset, config,'outputs/4_test_4_epoch_1000_step_acc_82.91284403669725%.ckpt')
