@@ -1,4 +1,4 @@
-﻿# 目录
+﻿# BERT
 <!-- TOC -->
 - [目录](#目录)
 - [BERT概述](#Bert概述)
@@ -60,6 +60,7 @@ BERT的主干结构为Transformer。对于BERT_base，Transformer包含12个编�
 - 更多关于Mindspore的信息，请查看以下资源：
     - [MindSpore教程](https://www.mindspore.cn/tutorials/zh-CN/r1.8/index.html)
     - [MindSpore Python API](https://www.mindspore.cn/docs/zh-CN/r1.8/index.html)
+- 软件环境，MindSpore：1.8.1
 
 # 快速入门
 
