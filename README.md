@@ -1,4 +1,4 @@
-﻿# BERT
+# BERT
 <!-- TOC -->
 - [目录](#目录)
 - [BERT概述](#Bert概述)
@@ -32,18 +32,20 @@ BERT网络由谷歌在2018年提出，该网络在自然语言处理领域取得
 
 [论文](https://arxiv.org/abs/1810.04805):  Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova.[BERT：深度双向Transformer语言理解预训练](https://arxiv.org/abs/1810.04805)). arXiv preprint arXiv:1810.04805.
 
-[论文](https://arxiv.org/abs/1909.00204):  Junqiu Wei, Xiaozhe Ren, Xiaoguang Li, Wenyong Huang, Yi Liao, Yasheng Wang, Jiashu Lin, Xin Jiang, Xiao Chen, Qun Liu.[NEZHA：面向汉语理解的神经语境表示](https://arxiv.org/abs/1909.00204). arXiv preprint arXiv:1909.00204.
+如果您对小规格Bert预训练的蒸馏、剪枝感兴趣可以参考论文[Well-Read Students Learn Better: On the Importance of Pre-training Compact Models](https://arxiv.org/abs/1908.08962)。这能使小规格的Bert性能更优，目前[cqunlp/bert](https://github.com/cqunlp/bert/tree/master)项目暂时未采用上诉方法。
 
 # 项目简述
-本项目专注于Bert较小的规格
+本项目专注于Bert较小的规格，目前支持Bert-L4-H128、Bert-L4-H256、Bert-L4-H512、Bert-L4-H768、Bert-L6-H256、Bert-L6-H512、Bert-L6-H768、Bert-L8-H512、Bert-L6-H768规格的Bert，详见[Bert官方仓库](https://github.com/google-research/bert)
 # 模型架构
 
-BERT的主干结构为Transformer。对于BERT_base，Transformer包含12个编码器模块，每个模块包含一个自注意模块，每个自注意模块包含一个注意模块。对于BERT_NEZHA，Transformer包含24个编码器模块，每个模块包含一个自注意模块，每个自注意模块包含一个注意模块。BERT_base和BERT_NEZHA的区别在于，BERT_base使用绝对位置编码生成位置嵌入向量，而BERT_NEZHA使用相对位置编码。
+BERT的主干结构为Transformer。BERT由两个组成部分构成：Transformer编码器和预训练任务。Transformer编码器是BERT的主体，由多个Transformer块组成，每个块包含了一个自注意力机制和一些全连接层。预训练任务是在大量未标注数据上训练出来的，包括掩码语言模型和下一句预测任务。
+
+具体来说，BERT的输入是一组token，每个token由三个部分组成：token本身、segment ID和position embedding。其中，segment ID用于区分两个句子，position embedding表示每个token在输入序列中的位置。BERT将输入序列通过一系列的Transformer编码器，每个编码器都包含一个自注意力机制和一个前馈神经网络（feedforward neural network）。自注意力机制可以对输入序列中的所有token进行建模，然后得到一个表示整个序列的向量。这些向量在不同的编码器之间不断传递和更新，最终得到一个整个序列的表示，称为BERT的输出。
 
 # 数据集
 
 - 生成预训练数据集
-    - 下载[zhwiki](https://dumps.wikimedia.org/zhwiki/)或[enwiki](https://dumps.wikimedia.org/enwiki/)数据集进行预训练，
+    - 下载[enwiki](https://dumps.wikimedia.org/enwiki/)数据集进行预训练，
     - 使用[WikiExtractor](https://github.com/attardi/wikiextractor)提取和整理数据集中的文本，使用步骤如下：
         - pip install wikiextractor
         - python -m wikiextractor.WikiExtractor -o <output file path> -b <output file size> <Wikipedia dump file>
@@ -53,7 +55,7 @@ BERT的主干结构为Transformer。对于BERT_base，Transformer包含12个编�
 
 # 环境要求
 
-- 硬件（Ascend处理器）
+- 硬件（Ascend处理器或GPU）
     - 准备Ascend或GPU处理器搭建硬件环境。
 - 框架
     - [MindSpore](https://gitee.com/mindspore/mindspore)
@@ -69,11 +71,12 @@ BERT的主干结构为Transformer。对于BERT_base，Transformer包含12个编�
 - 在Ascend上运行
 ```bash
 # 单卡运行测试示例
-#切换到ascedn分支
+#切换到ascend分支
 git checkout ascend
 python run_pretrain_test_one_card.py
+
 # 多卡并行运行预训练示例
-#切换到ascedn分支
+#切换到ascend分支
 git checkout ascend
 bash run_pretrain_ascend.sh
 
@@ -88,10 +91,13 @@ bash run_pretrain_ascend.sh
 ```bash
 
 # 单机运行测试示例
+#切换到bert-mini分支
+git checkout bert-mini
 python run_pretrain_test_one_card.py
 
 # 分布式运行预训练示例
-
+#切换到主分支
+git checkout main
 bash run_pretrain_bert.sh
 
 # 运行微调sst-2和评估示例
